@@ -51,13 +51,16 @@
 
 ## 安装使用
 
+### 系统要求
+
+- Windows 10/11 (64-bit)
+
 ### 下载安装
 
 从 [Releases](https://github.com/Kalstro/FileOG/releases) 页面下载最新版本：
 
-- **Windows**: `FileOG_x.x.x_x64-setup.exe` (NSIS 安装程序) 或 `FileOG_x.x.x_x64_en-US.msi`
-- **macOS**: 即将支持
-- **Linux**: 即将支持
+- `FileOG_x.x.x_x64-setup.exe` - NSIS 安装程序
+- `FileOG_x.x.x_x64_en-US.msi` - MSI 安装包
 
 ### 配置 LLM
 

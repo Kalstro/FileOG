@@ -51,15 +51,10 @@ jobs:
             ### 下载说明
             | 平台 | 文件 |
             |------|------|
-            | Windows | `.msi` 或 `.exe` 安装包 |
-            | macOS (Apple Silicon) | `aarch64.dmg` |
-            | macOS (Intel) | `x64.dmg` |
-            | Linux | `.deb` 或 `.AppImage` |
+            | Windows | `.msi` 安装包 或 `.exe` 便携版 |
 
             ### 安装要求
             - Windows 10/11 (64-bit)
-            - macOS 10.15+
-            - Linux (glibc 2.31+)
           draft: true
           prerelease: false
 
@@ -67,24 +62,7 @@ jobs:
     needs: create-release
     permissions:
       contents: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: macos-latest
-            target: aarch64-apple-darwin
-            args: '--target aarch64-apple-darwin'
-          - platform: macos-latest
-            target: x86_64-apple-darwin
-            args: '--target x86_64-apple-darwin'
-          - platform: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
-            args: ''
-          - platform: windows-latest
-            target: x86_64-pc-windows-msvc
-            args: ''
-
-    runs-on: ${{ matrix.platform }}
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -112,19 +90,11 @@ jobs:
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
-
-      - name: Install dependencies (Ubuntu)
-        if: matrix.platform == 'ubuntu-22.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
       - name: Install frontend dependencies
         run: pnpm install
@@ -135,7 +105,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           releaseId: ${{ needs.create-release.outputs.release_id }}
-          args: ${{ matrix.args }}
 
   publish-release:
     needs: [create-release, build-release]
