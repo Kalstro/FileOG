@@ -60,6 +60,10 @@ test-files/
 *.AppImage
 *.deb
 *.rpm
+
+# Local build script and output
+build.bat
+FileOG.exe
 src-tauri/CLAUDE.md
 CLAUDE.md
 .claude/index.json
