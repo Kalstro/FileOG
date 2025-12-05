@@ -32,10 +32,10 @@ const fileTypeIcons: Record<string, React.ElementType> = {
 const fileTypeColors: Record<string, string> = {
   document: "text-blue-500",
   image: "text-green-500",
-  video: "text-purple-500",
+  video: "text-orange-500",
   audio: "text-amber-500",
   code: "text-pink-500",
-  archive: "text-indigo-500",
+  archive: "text-cyan-500",
   other: "text-zinc-500",
 };
 

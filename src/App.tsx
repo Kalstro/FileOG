@@ -26,6 +26,12 @@ interface OperationProgress {
   percentage: number;
 }
 
+interface DuplicateGroup {
+  hash: string;
+  files: string[];
+  size: number;
+}
+
 function App() {
   const [files, setFiles] = useState<FileItemData[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -33,6 +39,9 @@ function App() {
   const [isClassifying, setIsClassifying] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0, file: "" });
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<string | null>(null);
+  const [duplicates, setDuplicates] = useState<DuplicateGroup[]>([]);
+  const [showDuplicates, setShowDuplicates] = useState(false);
 
   const handleScan = useCallback(async () => {
     const selected = await open({ directory: true });
@@ -210,7 +219,7 @@ function App() {
     if (selectedIds.size === 0) return;
 
     const confirmed = await confirm(
-      `确定要删除选中的 ${selectedIds.size} 个文件吗？此操作不可撤销。`,
+      `确定要删除选中的 ${selectedIds.size} 个文件吗？文件将移入回收站，可通过撤销操作恢复。`,
       { title: "确认删除", kind: "warning" }
     );
     if (!confirmed) return;
@@ -250,8 +259,81 @@ function App() {
     }
   }, [files, selectedIds]);
 
+  const handleFilterChange = useCallback((category: string | null) => {
+    setActiveFilter(category);
+    setShowDuplicates(false);
+  }, []);
+
+  const handleFindDuplicates = useCallback(async () => {
+    if (files.length === 0) {
+      toast.info("请先扫描文件夹");
+      return;
+    }
+
+    setIsProcessing(true);
+    setProgress({ current: 0, total: files.length, file: "正在查找重复文件..." });
+
+    const onProgress = new Channel<OperationProgress>();
+    onProgress.onmessage = (msg) => {
+      setProgress({
+        current: msg.completed_count,
+        total: msg.total_count,
+        file: msg.current_file || "",
+      });
+    };
+
+    try {
+      const result = await invoke<DuplicateGroup[]>("find_duplicates", {
+        files: files.map(f => ({
+          id: f.id,
+          name: f.name,
+          path: f.path,
+          size: f.size,
+          extension: f.name.includes('.') ? f.name.split('.').pop() : null,
+          file_type: f.fileType || "other",
+          hash: null,
+          created_at: 0,
+          modified_at: 0,
+          category: f.category || null,
+          metadata: {
+            mime_type: null,
+            dimensions: null,
+            duration: null,
+            preview_text: null,
+          },
+        })),
+        onProgress,
+      });
+      setDuplicates(result);
+      setShowDuplicates(true);
+      setActiveFilter(null);
+      if (result.length === 0) {
+        toast.info("未找到重复文件");
+      } else {
+        const totalDupes = result.reduce((acc, g) => acc + g.files.length - 1, 0);
+        toast.success(`找到 ${result.length} 组重复文件，共 ${totalDupes} 个重复`);
+      }
+    } catch (e) {
+      console.error("Find duplicates failed:", e);
+      toast.error(`查找重复文件失败: ${e}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [files]);
+
+  // Filter files based on active filter
+  const filteredFiles = activeFilter
+    ? files.filter((f) => f.category === activeFilter)
+    : files;
+
   return (
-    <MainLayout onScan={handleScan} onOpenSettings={() => setSettingsOpen(true)}>
+    <MainLayout
+      onScan={handleScan}
+      onOpenSettings={() => setSettingsOpen(true)}
+      onFilterChange={handleFilterChange}
+      onFindDuplicates={handleFindDuplicates}
+      activeFilter={activeFilter}
+    >
       <div className="space-y-4">
         {selectedIds.size > 0 && (
           <div className="flex items-center gap-2 rounded-lg border bg-muted/50 p-2">
@@ -301,12 +383,61 @@ function App() {
           </div>
         )}
 
-        <FileList
-          files={files}
-          selectedIds={selectedIds}
-          onSelect={handleSelect}
-          onSelectAll={handleSelectAll}
-        />
+        {/* Filter/Duplicate status bar */}
+        {(activeFilter || showDuplicates) && (
+          <div className="flex items-center gap-2 rounded-lg border bg-blue-50 dark:bg-blue-950/30 p-2">
+            <span className="text-sm text-blue-600 dark:text-blue-400 px-2">
+              {activeFilter && `正在显示: ${activeFilter} (${filteredFiles.length} 个文件)`}
+              {showDuplicates && `重复文件: ${duplicates.length} 组`}
+            </span>
+            <div className="flex-1" />
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setActiveFilter(null);
+                setShowDuplicates(false);
+              }}
+            >
+              清除筛选
+            </Button>
+          </div>
+        )}
+
+        {/* Duplicate groups display */}
+        {showDuplicates && duplicates.length > 0 && (
+          <div className="space-y-3">
+            {duplicates.map((group, idx) => (
+              <div key={group.hash} className="rounded-lg border bg-orange-50 dark:bg-orange-950/20 p-3">
+                <div className="text-sm font-medium text-orange-700 dark:text-orange-400 mb-2">
+                  重复组 {idx + 1} ({group.files.length} 个文件, {(group.size / 1024).toFixed(1)} KB)
+                </div>
+                <div className="space-y-1">
+                  {group.files.map((filePath, fileIdx) => (
+                    <div
+                      key={filePath}
+                      className="text-sm text-muted-foreground flex items-center gap-2"
+                    >
+                      <span className={fileIdx === 0 ? "text-green-600" : "text-orange-600"}>
+                        {fileIdx === 0 ? "保留" : "重复"}
+                      </span>
+                      <span className="truncate flex-1">{filePath}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {!showDuplicates && (
+          <FileList
+            files={filteredFiles}
+            selectedIds={selectedIds}
+            onSelect={handleSelect}
+            onSelectAll={handleSelectAll}
+          />
+        )}
       </div>
 
       <ProgressPanel

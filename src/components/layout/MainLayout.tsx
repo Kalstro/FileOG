@@ -8,12 +8,28 @@ interface MainLayoutProps {
   children: React.ReactNode;
   onScan?: () => void;
   onOpenSettings?: () => void;
+  onFilterChange?: (category: string | null) => void;
+  onFindDuplicates?: () => void;
+  activeFilter?: string | null;
 }
 
-export function MainLayout({ children, onScan, onOpenSettings }: MainLayoutProps) {
+export function MainLayout({
+  children,
+  onScan,
+  onOpenSettings,
+  onFilterChange,
+  onFindDuplicates,
+  activeFilter,
+}: MainLayoutProps) {
   return (
     <SidebarProvider>
-      <AppSidebar onScan={onScan} onOpenSettings={onOpenSettings} />
+      <AppSidebar
+        onScan={onScan}
+        onOpenSettings={onOpenSettings}
+        onFilterChange={onFilterChange}
+        onFindDuplicates={onFindDuplicates}
+        activeFilter={activeFilter}
+      />
       <SidebarInset>
         <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
           <SidebarTrigger className="-ml-1" />

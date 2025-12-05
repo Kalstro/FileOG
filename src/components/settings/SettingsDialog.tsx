@@ -173,7 +173,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
         pattern: "",
         priority: 1,
       }],
-      color: "#6366f1",
+      color: "#3B82F6",
       icon: "folder",
     };
     setCategories([...categories, newCategory]);

@@ -23,11 +23,14 @@ import {
   History,
   Undo2,
   Settings,
+  Copy,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { invoke } from "@tauri-apps/api/core";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 // Icon mapping for category names
 const categoryIconMap: Record<string, LucideIcon> = {
@@ -47,15 +50,15 @@ const categoryIconMap: Record<string, LucideIcon> = {
   "others": File,
 };
 
-// Default categories as fallback
+// Default categories with non-purple colors
 const defaultCategories = [
-  { id: "documents", name: "文档", color: "#3B82F6" },
-  { id: "images", name: "图片", color: "#10B981" },
-  { id: "videos", name: "视频", color: "#8B5CF6" },
-  { id: "music", name: "音乐", color: "#F59E0B" },
-  { id: "code", name: "代码", color: "#EC4899" },
-  { id: "archives", name: "压缩包", color: "#6366F1" },
-  { id: "others", name: "其他", color: "#71717A" },
+  { id: "documents", name: "文档", color: "#3B82F6" },  // Blue
+  { id: "images", name: "图片", color: "#10B981" },    // Green
+  { id: "videos", name: "视频", color: "#F97316" },    // Orange (was purple)
+  { id: "music", name: "音乐", color: "#F59E0B" },     // Amber
+  { id: "code", name: "代码", color: "#EC4899" },      // Pink
+  { id: "archives", name: "压缩包", color: "#06B6D4" }, // Cyan (was purple)
+  { id: "others", name: "其他", color: "#71717A" },    // Gray
 ];
 
 interface Category {
@@ -74,9 +77,18 @@ interface OperationBatch {
 interface AppSidebarProps {
   onScan?: () => void;
   onOpenSettings?: () => void;
+  onFilterChange?: (category: string | null) => void;
+  onFindDuplicates?: () => void;
+  activeFilter?: string | null;
 }
 
-export function AppSidebar({ onScan, onOpenSettings }: AppSidebarProps) {
+export function AppSidebar({
+  onScan,
+  onOpenSettings,
+  onFilterChange,
+  onFindDuplicates,
+  activeFilter,
+}: AppSidebarProps) {
   const [historyCount, setHistoryCount] = useState(0);
   const [categories, setCategories] = useState<Category[]>(defaultCategories);
 
@@ -130,6 +142,14 @@ export function AppSidebar({ onScan, onOpenSettings }: AppSidebarProps) {
     }
   };
 
+  const handleCategoryClick = (categoryName: string) => {
+    if (activeFilter === categoryName) {
+      onFilterChange?.(null);
+    } else {
+      onFilterChange?.(categoryName);
+    }
+  };
+
   return (
     <Sidebar>
       <SidebarHeader className="p-4">
@@ -145,19 +165,42 @@ export function AppSidebar({ onScan, onOpenSettings }: AppSidebarProps) {
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>分类</SidebarGroupLabel>
+          <SidebarGroupLabel className="flex items-center justify-between">
+            <span>分类筛选</span>
+            {activeFilter && (
+              <button
+                onClick={() => onFilterChange?.(null)}
+                className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+              >
+                <X className="h-3 w-3" />
+                清除
+              </button>
+            )}
+          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {categories.map((category) => {
                 const Icon = categoryIconMap[category.name] || categoryIconMap[category.id] || File;
+                const isActive = activeFilter === category.name;
                 return (
                   <SidebarMenuItem key={category.id}>
-                    <SidebarMenuButton>
+                    <SidebarMenuButton
+                      onClick={() => handleCategoryClick(category.name)}
+                      className={cn(
+                        "transition-colors",
+                        isActive && "bg-accent text-accent-foreground font-medium"
+                      )}
+                    >
                       <Icon
                         className="h-4 w-4"
                         style={{ color: category.color || "#71717A" }}
                       />
                       <span>{category.name}</span>
+                      {isActive && (
+                        <span className="ml-auto text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded">
+                          筛选中
+                        </span>
+                      )}
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 );
@@ -167,9 +210,15 @@ export function AppSidebar({ onScan, onOpenSettings }: AppSidebarProps) {
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel>操作</SidebarGroupLabel>
+          <SidebarGroupLabel>工具</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton onClick={onFindDuplicates}>
+                  <Copy className="h-4 w-4" />
+                  <span>查找重复文件</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton onClick={handleShowHistory}>
                   <History className="h-4 w-4" />
@@ -182,7 +231,7 @@ export function AppSidebar({ onScan, onOpenSettings }: AppSidebarProps) {
               <SidebarMenuItem>
                 <SidebarMenuButton onClick={handleUndo}>
                   <Undo2 className="h-4 w-4" />
-                  <span>撤销</span>
+                  <span>撤销操作</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
