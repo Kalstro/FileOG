@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version (e.g., v0.1.0)'
+        description: 'Release version (e.g., v0.2.0)'
         required: true
         type: string
 
@@ -15,56 +15,22 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  create-release:
-    runs-on: ubuntu-22.04
-    outputs:
-      release_id: ${{ steps.create_release.outputs.id }}
-      version: ${{ steps.get_version.outputs.version }}
+  build-release:
+    permissions:
+      contents: write
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
 
       - name: Get version
         id: get_version
+        shell: bash
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
           else
             echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
           fi
-
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ steps.get_version.outputs.version }}
-          release_name: FileOG ${{ steps.get_version.outputs.version }}
-          body: |
-            ## FileOG ${{ steps.get_version.outputs.version }}
-
-            智能文件整理工具 - AI 驱动的文件分类与管理
-
-            ### 新功能
-            - 查看 [CHANGELOG](https://github.com/Kalstro/FileOG/blob/main/CHANGELOG.md) 了解详细更新
-
-            ### 下载说明
-            | 平台 | 文件 |
-            |------|------|
-            | Windows | `.msi` 安装包 或 `.exe` 便携版 |
-
-            ### 安装要求
-            - Windows 10/11 (64-bit)
-          draft: true
-          prerelease: false
-
-  build-release:
-    needs: create-release
-    permissions:
-      contents: write
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -99,24 +65,37 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install
 
-      - name: Build and upload
+      - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          releaseId: ${{ needs.create-release.outputs.release_id }}
+          tagName: ${{ steps.get_version.outputs.version }}
+          releaseName: 'FileOG ${{ steps.get_version.outputs.version }}'
+          releaseBody: |
+            ## FileOG ${{ steps.get_version.outputs.version }}
 
-  publish-release:
-    needs: [create-release, build-release]
-    runs-on: ubuntu-22.04
-    steps:
-      - name: Publish Release
-        uses: actions/github-script@v7
+            智能文件整理工具 - AI 驱动的文件分类与管理
+
+            ### 更新内容
+            查看 [CHANGELOG](https://github.com/Kalstro/FileOG/blob/main/CHANGELOG.md) 了解详细更新
+
+            ### 下载说明
+            | 文件 | 说明 |
+            |------|------|
+            | `FileOG.exe` | 便携版（无需安装，直接运行） |
+            | `FileOG_x.x.x_x64-setup.exe` | NSIS 安装程序 |
+            | `FileOG_x.x.x_x64_en-US.msi` | MSI 安装包 |
+
+            ### 系统要求
+            - Windows 10/11 (64-bit)
+          releaseDraft: false
+          prerelease: false
+
+      - name: Upload portable exe
+        uses: softprops/action-gh-release@v1
         with:
-          script: |
-            await github.rest.repos.updateRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              release_id: ${{ needs.create-release.outputs.release_id }},
-              draft: false
-            });
+          tag_name: ${{ steps.get_version.outputs.version }}
+          files: src-tauri/target/release/FileOG.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
