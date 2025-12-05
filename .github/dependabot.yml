@@ -1,0 +1,48 @@
+version: 2
+updates:
+  # Frontend dependencies (npm/pnpm)
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+    open-pull-requests-limit: 10
+    groups:
+      dev-dependencies:
+        dependency-type: "development"
+        patterns:
+          - "@types/*"
+          - "typescript"
+          - "vite"
+          - "@vitejs/*"
+      ui-components:
+        patterns:
+          - "@radix-ui/*"
+          - "lucide-react"
+      tauri:
+        patterns:
+          - "@tauri-apps/*"
+
+  # Backend dependencies (Cargo)
+  - package-ecosystem: "cargo"
+    directory: "/src-tauri"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+    open-pull-requests-limit: 5
+    groups:
+      tauri:
+        patterns:
+          - "tauri"
+          - "tauri-*"
+      serde:
+        patterns:
+          - "serde"
+          - "serde_json"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 3

@@ -1,3 +1,3 @@
 pub mod llm;
 
-pub use llm::{LlmService, ClassificationResult};
+pub use llm::{ClassificationResult, LlmService};

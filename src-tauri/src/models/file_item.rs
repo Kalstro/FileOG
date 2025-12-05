@@ -32,9 +32,12 @@ impl FileType {
     pub fn from_extension(ext: &str) -> Self {
         match ext.to_lowercase().as_str() {
             // Documents
-            "pdf" | "doc" | "docx" | "xls" | "xlsx" | "ppt" | "pptx" | "txt" | "rtf" | "odt" | "ods" | "odp" => FileType::Document,
+            "pdf" | "doc" | "docx" | "xls" | "xlsx" | "ppt" | "pptx" | "txt" | "rtf" | "odt"
+            | "ods" | "odp" => FileType::Document,
             // Images
-            "jpg" | "jpeg" | "png" | "gif" | "webp" | "svg" | "bmp" | "ico" | "tiff" | "heic" => FileType::Image,
+            "jpg" | "jpeg" | "png" | "gif" | "webp" | "svg" | "bmp" | "ico" | "tiff" | "heic" => {
+                FileType::Image
+            }
             // Videos
             "mp4" | "mkv" | "avi" | "mov" | "wmv" | "flv" | "webm" | "m4v" => FileType::Video,
             // Audio
@@ -42,7 +45,9 @@ impl FileType {
             // Archives
             "zip" | "rar" | "7z" | "tar" | "gz" | "bz2" | "xz" => FileType::Archive,
             // Code
-            "js" | "ts" | "jsx" | "tsx" | "py" | "rs" | "go" | "java" | "c" | "cpp" | "h" | "hpp" | "cs" | "rb" | "php" | "swift" | "kt" | "scala" | "html" | "css" | "scss" | "json" | "yaml" | "yml" | "xml" | "md" | "sql" => FileType::Code,
+            "js" | "ts" | "jsx" | "tsx" | "py" | "rs" | "go" | "java" | "c" | "cpp" | "h"
+            | "hpp" | "cs" | "rb" | "php" | "swift" | "kt" | "scala" | "html" | "css" | "scss"
+            | "json" | "yaml" | "yml" | "xml" | "md" | "sql" => FileType::Code,
             _ => FileType::Other,
         }
     }

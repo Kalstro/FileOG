@@ -1,11 +1,11 @@
 use crate::error::AppError;
-use crate::models::{Operation, OperationType, OperationStatus, PlannedOperation};
+use crate::models::{Operation, OperationStatus, OperationType, PlannedOperation};
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use tauri::ipc::Channel;
 use tauri::Manager;
 use uuid::Uuid;
-use chrono::Utc;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct OperationProgress {
@@ -85,22 +85,15 @@ pub async fn execute_operations(
 
         let result = match planned.operation_type {
             OperationType::Move => {
-                std::fs::rename(&planned.source, &planned.destination)
-                    .map_err(AppError::Io)
+                std::fs::rename(&planned.source, &planned.destination).map_err(AppError::Io)
             }
-            OperationType::Copy => {
-                std::fs::copy(&planned.source, &planned.destination)
-                    .map(|_| ())
-                    .map_err(AppError::Io)
-            }
+            OperationType::Copy => std::fs::copy(&planned.source, &planned.destination)
+                .map(|_| ())
+                .map_err(AppError::Io),
             OperationType::Rename => {
-                std::fs::rename(&planned.source, &planned.destination)
-                    .map_err(AppError::Io)
+                std::fs::rename(&planned.source, &planned.destination).map_err(AppError::Io)
             }
-            OperationType::Delete => {
-                std::fs::remove_file(&planned.source)
-                    .map_err(AppError::Io)
-            }
+            OperationType::Delete => std::fs::remove_file(&planned.source).map_err(AppError::Io),
         };
 
         let destination_path = match planned.operation_type {
@@ -155,7 +148,7 @@ pub async fn find_duplicates(
     files: Vec<crate::models::FileItem>,
     on_progress: Channel<OperationProgress>,
 ) -> Result<Vec<DuplicateGroup>, AppError> {
-    use sha2::{Sha256, Digest};
+    use sha2::{Digest, Sha256};
     use std::collections::HashMap;
     use std::io::Read;
 
@@ -185,10 +178,7 @@ pub async fn find_duplicates(
             }
 
             let hash = format!("{:x}", hasher.finalize());
-            hash_map
-                .entry(hash)
-                .or_default()
-                .push(file.path.clone());
+            hash_map.entry(hash).or_default().push(file.path.clone());
         }
     }
 
@@ -197,9 +187,7 @@ pub async fn find_duplicates(
         .into_iter()
         .filter(|(_, paths)| paths.len() > 1)
         .map(|(hash, files)| {
-            let size = std::fs::metadata(&files[0])
-                .map(|m| m.len())
-                .unwrap_or(0);
+            let size = std::fs::metadata(&files[0]).map(|m| m.len()).unwrap_or(0);
             DuplicateGroup { hash, files, size }
         })
         .collect();

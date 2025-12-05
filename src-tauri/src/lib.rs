@@ -1,9 +1,9 @@
+pub mod commands;
 pub mod error;
 pub mod models;
-pub mod commands;
 pub mod services;
 
-use commands::{scan, file_ops, settings, history, llm};
+use commands::{file_ops, history, llm, scan, settings};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {

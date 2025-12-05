@@ -1,6 +1,6 @@
 use crate::error::AppError;
 use crate::models::AppSettings;
-use crate::services::llm::{LlmService, ClassificationResult};
+use crate::services::llm::{ClassificationResult, LlmService};
 use tauri::Manager;
 
 #[derive(serde::Deserialize)]
@@ -17,7 +17,8 @@ pub struct FileToClassify {
 }
 
 fn read_settings(app: &tauri::AppHandle) -> Result<AppSettings, AppError> {
-    let path = app.path()
+    let path = app
+        .path()
         .app_config_dir()
         .unwrap_or_else(|_| std::path::PathBuf::from("."))
         .join("settings.json");
@@ -97,12 +98,19 @@ pub async fn classify_single_file(
     };
 
     service
-        .classify_file(&file.name, &file.extension, file.size, &categories, custom_prompt)
+        .classify_file(
+            &file.name,
+            &file.extension,
+            file.size,
+            &categories,
+            custom_prompt,
+        )
         .await
 }
 
 fn get_category_names(app: &tauri::AppHandle) -> Result<Vec<String>, AppError> {
-    let config_dir = app.path()
+    let config_dir = app
+        .path()
         .app_config_dir()
         .map_err(|e| AppError::Config(e.to_string()))?;
 
@@ -132,9 +140,7 @@ fn get_category_names(app: &tauri::AppHandle) -> Result<Vec<String>, AppError> {
 }
 
 #[tauri::command]
-pub async fn test_llm_connection(
-    app: tauri::AppHandle,
-) -> Result<String, AppError> {
+pub async fn test_llm_connection(app: tauri::AppHandle) -> Result<String, AppError> {
     let settings = read_settings(&app)?;
     let config = settings.llm.config;
 

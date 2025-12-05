@@ -4,9 +4,67 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v0.1.0)'
+        required: true
+        type: string
+
+env:
+  CARGO_TERM_COLOR: always
 
 jobs:
-  release:
+  create-release:
+    runs-on: ubuntu-22.04
+    outputs:
+      release_id: ${{ steps.create_release.outputs.id }}
+      version: ${{ steps.get_version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get version
+        id: get_version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.get_version.outputs.version }}
+          release_name: FileOG ${{ steps.get_version.outputs.version }}
+          body: |
+            ## FileOG ${{ steps.get_version.outputs.version }}
+
+            智能文件整理工具 - AI 驱动的文件分类与管理
+
+            ### 新功能
+            - 查看 [CHANGELOG](https://github.com/Kalstro/FileOG/blob/main/CHANGELOG.md) 了解详细更新
+
+            ### 下载说明
+            | 平台 | 文件 |
+            |------|------|
+            | Windows | `.msi` 或 `.exe` 安装包 |
+            | macOS (Apple Silicon) | `aarch64.dmg` |
+            | macOS (Intel) | `x64.dmg` |
+            | Linux | `.deb` 或 `.AppImage` |
+
+            ### 安装要求
+            - Windows 10/11 (64-bit)
+            - macOS 10.15+
+            - Linux (glibc 2.31+)
+          draft: true
+          prerelease: false
+
+  build-release:
+    needs: create-release
     permissions:
       contents: write
     strategy:
@@ -14,12 +72,16 @@ jobs:
       matrix:
         include:
           - platform: macos-latest
+            target: aarch64-apple-darwin
             args: '--target aarch64-apple-darwin'
           - platform: macos-latest
+            target: x86_64-apple-darwin
             args: '--target x86_64-apple-darwin'
           - platform: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
             args: ''
           - platform: windows-latest
+            target: x86_64-pc-windows-msvc
             args: ''
 
     runs-on: ${{ matrix.platform }}
@@ -36,10 +98,27 @@ jobs:
         with:
           version: 9
 
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
 
       - name: Install dependencies (Ubuntu)
         if: matrix.platform == 'ubuntu-22.04'
@@ -50,23 +129,25 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install
 
-      - name: Build and release
+      - name: Build and upload
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: 'FileOG ${{ github.ref_name }}'
-          releaseBody: |
-            ## FileOG ${{ github.ref_name }}
-
-            智能文件整理工具
-
-            ### 下载说明
-            - **Windows**: 下载 `.msi` 或 `.exe` 安装包
-            - **macOS (Apple Silicon)**: 下载 `aarch64.dmg`
-            - **macOS (Intel)**: 下载 `x64.dmg`
-            - **Linux**: 下载 `.deb` 或 `.AppImage`
-          releaseDraft: true
-          prerelease: false
+          releaseId: ${{ needs.create-release.outputs.release_id }}
           args: ${{ matrix.args }}
+
+  publish-release:
+    needs: [create-release, build-release]
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Publish Release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: ${{ needs.create-release.outputs.release_id }},
+              draft: false
+            });

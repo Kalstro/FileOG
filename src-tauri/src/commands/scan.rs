@@ -45,7 +45,7 @@ pub async fn scan_directory(
 
     for entry in walker.into_iter().filter_map(|e| e.ok()) {
         let path = entry.path();
-        
+
         // Skip directories
         if path.is_dir() {
             continue;
@@ -65,10 +65,8 @@ pub async fn scan_directory(
             .file_name()
             .map(|n| n.to_string_lossy().to_string())
             .unwrap_or_default();
-        let extension = path
-            .extension()
-            .map(|e| e.to_string_lossy().to_string());
-        
+        let extension = path.extension().map(|e| e.to_string_lossy().to_string());
+
         let file_type = extension
             .as_ref()
             .map(|e| FileType::from_extension(e))

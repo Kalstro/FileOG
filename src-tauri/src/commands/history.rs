@@ -1,5 +1,5 @@
 use crate::error::AppError;
-use crate::models::{Operation, OperationBatch, OperationType, OperationStatus};
+use crate::models::{Operation, OperationBatch, OperationStatus, OperationType};
 use std::path::PathBuf;
 use tauri::Manager;
 
@@ -18,23 +18,23 @@ pub async fn get_operation_history(
     use rusqlite::Connection;
 
     let db_path = get_db_path(&app);
-    
+
     if !db_path.exists() {
         return Ok(Vec::new());
     }
 
     let conn = Connection::open(&db_path)?;
-    
+
     let limit = limit.unwrap_or(50);
-    
+
     let mut stmt = conn.prepare(
         "SELECT id, batch_id, operation_type, source_path, destination_path, 
                 original_name, new_name, timestamp, status, backup_path 
          FROM operations 
          ORDER BY timestamp DESC 
-         LIMIT ?"
+         LIMIT ?",
     )?;
-    
+
     let operations: Vec<Operation> = stmt
         .query_map([limit], |row| {
             Ok(Operation {
@@ -62,7 +62,7 @@ pub async fn get_operation_history(
     // Group by batch_id
     use std::collections::HashMap;
     let mut batches: HashMap<String, Vec<Operation>> = HashMap::new();
-    
+
     for op in operations {
         let batch_id = op.batch_id.clone().unwrap_or_else(|| op.id.clone());
         batches.entry(batch_id).or_default().push(op);
@@ -106,7 +106,7 @@ pub async fn undo_operations(
          FROM operations
          WHERE status = 'completed'
          ORDER BY timestamp DESC
-         LIMIT ?"
+         LIMIT ?",
     )?;
 
     let operations: Vec<Operation> = stmt
@@ -193,7 +193,7 @@ pub async fn clear_history(app: tauri::AppHandle) -> Result<(), AppError> {
     use rusqlite::Connection;
 
     let db_path = get_db_path(&app);
-    
+
     if db_path.exists() {
         let conn = Connection::open(&db_path)?;
         conn.execute("DELETE FROM operations", [])?;
@@ -206,14 +206,14 @@ pub fn init_database(app: &tauri::AppHandle) -> Result<(), AppError> {
     use rusqlite::Connection;
 
     let db_path = get_db_path(app);
-    
+
     // Ensure parent directory exists
     if let Some(parent) = db_path.parent() {
         std::fs::create_dir_all(parent)?;
     }
 
     let conn = Connection::open(&db_path)?;
-    
+
     conn.execute(
         "CREATE TABLE IF NOT EXISTS operations (
             id TEXT PRIMARY KEY,

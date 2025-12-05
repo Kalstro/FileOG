@@ -97,7 +97,10 @@ impl LlmService {
         let mut results = Vec::new();
 
         for (name, ext, size) in files {
-            match self.classify_file(&name, &ext, size, categories, custom_prompt).await {
+            match self
+                .classify_file(&name, &ext, size, categories, custom_prompt)
+                .await
+            {
                 Ok(result) => results.push(result),
                 Err(e) => {
                     // Log error but continue with other files
@@ -125,12 +128,8 @@ impl LlmService {
             "openai" | "openai-compatible" | "custom" => {
                 self.send_openai_request(system_prompt, user_prompt).await
             }
-            "anthropic" | "claude" => {
-                self.send_claude_request(system_prompt, user_prompt).await
-            }
-            "ollama" => {
-                self.send_ollama_request(system_prompt, user_prompt).await
-            }
+            "anthropic" | "claude" => self.send_claude_request(system_prompt, user_prompt).await,
+            "ollama" => self.send_ollama_request(system_prompt, user_prompt).await,
             _ => {
                 // Default to OpenAI-compatible API
                 self.send_openai_request(system_prompt, user_prompt).await
@@ -173,7 +172,8 @@ impl LlmService {
             max_tokens: 500,
         };
 
-        let response = self.client
+        let response = self
+            .client
             .post(&endpoint)
             .header("Authorization", format!("Bearer {}", self.config.api_key))
             .header("Content-Type", "application/json")
@@ -226,7 +226,8 @@ impl LlmService {
             ]
         });
 
-        let response = self.client
+        let response = self
+            .client
             .post(endpoint)
             .header("x-api-key", &self.config.api_key)
             .header("anthropic-version", "2023-06-01")
@@ -282,7 +283,8 @@ impl LlmService {
             "stream": false
         });
 
-        let response = self.client
+        let response = self
+            .client
             .post(endpoint)
             .header("Content-Type", "application/json")
             .json(&request)
@@ -373,7 +375,9 @@ mod tests {
         let service = LlmService::new(config);
 
         let response = r#"{"category": "documents", "confidence": 0.95, "reasoning": "PDF file"}"#;
-        let result = service.parse_classification_response(response, "test.pdf").unwrap();
+        let result = service
+            .parse_classification_response(response, "test.pdf")
+            .unwrap();
 
         assert_eq!(result.suggested_category, "documents");
         assert_eq!(result.confidence, 0.95);
