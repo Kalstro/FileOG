@@ -23,20 +23,46 @@ import {
   History,
   Undo2,
   Settings,
+  type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { invoke } from "@tauri-apps/api/core";
 import { toast } from "sonner";
 
-const categories = [
-  { id: "documents", name: "文档", icon: FileText, color: "#3B82F6" },
-  { id: "images", name: "图片", icon: Image, color: "#10B981" },
-  { id: "videos", name: "视频", icon: Video, color: "#8B5CF6" },
-  { id: "music", name: "音乐", icon: Music, color: "#F59E0B" },
-  { id: "code", name: "代码", icon: Code, color: "#EC4899" },
-  { id: "archives", name: "压缩包", icon: Archive, color: "#6366F1" },
-  { id: "others", name: "其他", icon: File, color: "#71717A" },
+// Icon mapping for category names
+const categoryIconMap: Record<string, LucideIcon> = {
+  "文档": FileText,
+  "documents": FileText,
+  "图片": Image,
+  "images": Image,
+  "视频": Video,
+  "videos": Video,
+  "音乐": Music,
+  "music": Music,
+  "代码": Code,
+  "code": Code,
+  "压缩包": Archive,
+  "archives": Archive,
+  "其他": File,
+  "others": File,
+};
+
+// Default categories as fallback
+const defaultCategories = [
+  { id: "documents", name: "文档", color: "#3B82F6" },
+  { id: "images", name: "图片", color: "#10B981" },
+  { id: "videos", name: "视频", color: "#8B5CF6" },
+  { id: "music", name: "音乐", color: "#F59E0B" },
+  { id: "code", name: "代码", color: "#EC4899" },
+  { id: "archives", name: "压缩包", color: "#6366F1" },
+  { id: "others", name: "其他", color: "#71717A" },
 ];
+
+interface Category {
+  id: string;
+  name: string;
+  color?: string;
+}
 
 interface OperationBatch {
   id: string;
@@ -52,10 +78,23 @@ interface AppSidebarProps {
 
 export function AppSidebar({ onScan, onOpenSettings }: AppSidebarProps) {
   const [historyCount, setHistoryCount] = useState(0);
+  const [categories, setCategories] = useState<Category[]>(defaultCategories);
 
   useEffect(() => {
     loadHistoryCount();
+    loadCategories();
   }, []);
+
+  const loadCategories = async () => {
+    try {
+      const result = await invoke<Category[]>("get_categories");
+      if (result && result.length > 0) {
+        setCategories(result);
+      }
+    } catch {
+      // Use default categories if loading fails
+    }
+  };
 
   const loadHistoryCount = async () => {
     try {
@@ -109,17 +148,20 @@ export function AppSidebar({ onScan, onOpenSettings }: AppSidebarProps) {
           <SidebarGroupLabel>分类</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {categories.map((category) => (
-                <SidebarMenuItem key={category.id}>
-                  <SidebarMenuButton>
-                    <category.icon
-                      className="h-4 w-4"
-                      style={{ color: category.color }}
-                    />
-                    <span>{category.name}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {categories.map((category) => {
+                const Icon = categoryIconMap[category.name] || categoryIconMap[category.id] || File;
+                return (
+                  <SidebarMenuItem key={category.id}>
+                    <SidebarMenuButton>
+                      <Icon
+                        className="h-4 w-4"
+                        style={{ color: category.color || "#71717A" }}
+                      />
+                      <span>{category.name}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

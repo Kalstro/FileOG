@@ -23,6 +23,21 @@ fn get_db_path(app: &tauri::AppHandle) -> PathBuf {
         .join("fileog.db")
 }
 
+fn get_trash_dir(app: &tauri::AppHandle) -> PathBuf {
+    let trash_dir = app
+        .path()
+        .app_data_dir()
+        .unwrap_or_else(|_| PathBuf::from("."))
+        .join("trash");
+
+    // Ensure trash directory exists
+    if !trash_dir.exists() {
+        let _ = std::fs::create_dir_all(&trash_dir);
+    }
+
+    trash_dir
+}
+
 fn save_operation_to_db(app: &tauri::AppHandle, operation: &Operation) -> Result<(), AppError> {
     use rusqlite::Connection;
 
@@ -83,6 +98,16 @@ pub async fn execute_operations(
             percentage: (index as f32 / total as f32) * 100.0,
         });
 
+        // For delete operations, create backup first
+        let backup_path = if matches!(planned.operation_type, OperationType::Delete) {
+            let trash_dir = get_trash_dir(&app);
+            let timestamp = Utc::now().timestamp_millis();
+            let backup_name = format!("{}_{}", timestamp, planned.file_name);
+            Some(trash_dir.join(backup_name))
+        } else {
+            None
+        };
+
         let result = match planned.operation_type {
             OperationType::Move => {
                 std::fs::rename(&planned.source, &planned.destination).map_err(AppError::Io)
@@ -93,7 +118,14 @@ pub async fn execute_operations(
             OperationType::Rename => {
                 std::fs::rename(&planned.source, &planned.destination).map_err(AppError::Io)
             }
-            OperationType::Delete => std::fs::remove_file(&planned.source).map_err(AppError::Io),
+            OperationType::Delete => {
+                // Move to trash instead of permanent delete
+                if let Some(ref backup) = backup_path {
+                    std::fs::rename(&planned.source, backup).map_err(AppError::Io)
+                } else {
+                    std::fs::remove_file(&planned.source).map_err(AppError::Io)
+                }
+            }
         };
 
         let destination_path = match planned.operation_type {
@@ -114,7 +146,7 @@ pub async fn execute_operations(
                 Err(e) => OperationStatus::Failed(e.to_string()),
             },
             batch_id: Some(batch_id.clone()),
-            backup_path: None,
+            backup_path,
         };
 
         // Save to database
