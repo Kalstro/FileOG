@@ -51,6 +51,9 @@ desktop.ini
 # Test coverage
 coverage/
 
+# Test files folder
+test-files/
+
 # Build artifacts (installers)
 *.msi
 *.dmg
