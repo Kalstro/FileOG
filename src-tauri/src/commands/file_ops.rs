@@ -86,20 +86,20 @@ pub async fn execute_operations(
         let result = match planned.operation_type {
             OperationType::Move => {
                 std::fs::rename(&planned.source, &planned.destination)
-                    .map_err(|e| AppError::Io(e))
+                    .map_err(AppError::Io)
             }
             OperationType::Copy => {
                 std::fs::copy(&planned.source, &planned.destination)
                     .map(|_| ())
-                    .map_err(|e| AppError::Io(e))
+                    .map_err(AppError::Io)
             }
             OperationType::Rename => {
                 std::fs::rename(&planned.source, &planned.destination)
-                    .map_err(|e| AppError::Io(e))
+                    .map_err(AppError::Io)
             }
             OperationType::Delete => {
                 std::fs::remove_file(&planned.source)
-                    .map_err(|e| AppError::Io(e))
+                    .map_err(AppError::Io)
             }
         };
 
@@ -187,7 +187,7 @@ pub async fn find_duplicates(
             let hash = format!("{:x}", hasher.finalize());
             hash_map
                 .entry(hash)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(file.path.clone());
         }
     }

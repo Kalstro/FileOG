@@ -65,7 +65,7 @@ pub async fn get_operation_history(
     
     for op in operations {
         let batch_id = op.batch_id.clone().unwrap_or_else(|| op.id.clone());
-        batches.entry(batch_id).or_insert_with(Vec::new).push(op);
+        batches.entry(batch_id).or_default().push(op);
     }
 
     let result: Vec<OperationBatch> = batches

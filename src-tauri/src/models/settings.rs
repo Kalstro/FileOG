@@ -19,19 +19,10 @@ impl Default for AppSettings {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct LlmSettings {
     pub enabled: bool,
     pub config: LlmConfig,
-}
-
-impl Default for LlmSettings {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            config: LlmConfig::default(),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
