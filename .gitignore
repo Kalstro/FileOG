@@ -63,6 +63,7 @@ test-files/
 
 # Local build script and output
 build.bat
+check.bat
 FileOG.exe
 src-tauri/CLAUDE.md
 CLAUDE.md
