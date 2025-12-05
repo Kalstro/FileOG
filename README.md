@@ -53,7 +53,7 @@
 
 ### 下载安装
 
-从 [Releases](https://github.com/yourusername/FileOG/releases) 页面下载最新版本：
+从 [Releases](https://github.com/Kalstro/FileOG/releases) 页面下载最新版本：
 
 - **Windows**: `FileOG_x.x.x_x64-setup.exe` (NSIS 安装程序) 或 `FileOG_x.x.x_x64_en-US.msi`
 - **macOS**: 即将支持
@@ -85,7 +85,7 @@
 
 ```bash
 # 克隆仓库
-git clone https://github.com/yourusername/FileOG.git
+git clone https://github.com/Kalstro/FileOG.git
 cd FileOG
 
 # 安装依赖
