@@ -3,6 +3,7 @@ use crate::models::{Operation, OperationType, OperationStatus, PlannedOperation}
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use tauri::ipc::Channel;
+use tauri::Manager;
 use uuid::Uuid;
 use chrono::Utc;
 
@@ -15,13 +16,63 @@ pub struct OperationProgress {
     pub percentage: f32,
 }
 
+fn get_db_path(app: &tauri::AppHandle) -> PathBuf {
+    app.path()
+        .app_data_dir()
+        .unwrap_or_else(|_| PathBuf::from("."))
+        .join("fileog.db")
+}
+
+fn save_operation_to_db(app: &tauri::AppHandle, operation: &Operation) -> Result<(), AppError> {
+    use rusqlite::Connection;
+
+    let db_path = get_db_path(app);
+    let conn = Connection::open(&db_path)?;
+
+    let op_type = match operation.operation_type {
+        OperationType::Move => "move",
+        OperationType::Copy => "copy",
+        OperationType::Rename => "rename",
+        OperationType::Delete => "delete",
+    };
+
+    let status = match &operation.status {
+        OperationStatus::Completed => "completed".to_string(),
+        OperationStatus::Failed(e) => format!("failed:{}", e),
+        OperationStatus::Pending => "pending".to_string(),
+        OperationStatus::InProgress => "in_progress".to_string(),
+        OperationStatus::Undone => "undone".to_string(),
+    };
+
+    conn.execute(
+        "INSERT INTO operations (id, batch_id, operation_type, source_path, destination_path, original_name, new_name, timestamp, status, backup_path)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+        (
+            &operation.id,
+            &operation.batch_id,
+            op_type,
+            operation.source_path.to_string_lossy().to_string(),
+            operation.destination_path.as_ref().map(|p| p.to_string_lossy().to_string()),
+            &operation.original_name,
+            &operation.new_name,
+            operation.timestamp,
+            status,
+            operation.backup_path.as_ref().map(|p| p.to_string_lossy().to_string()),
+        ),
+    )?;
+
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn execute_operations(
+    app: tauri::AppHandle,
     operations: Vec<PlannedOperation>,
     on_progress: Channel<OperationProgress>,
 ) -> Result<Vec<Operation>, AppError> {
     let total = operations.len();
     let mut results = Vec::new();
+    let batch_id = Uuid::new_v4().to_string();
 
     for (index, planned) in operations.into_iter().enumerate() {
         let _ = on_progress.send(OperationProgress {
@@ -52,21 +103,31 @@ pub async fn execute_operations(
             }
         };
 
+        let destination_path = match planned.operation_type {
+            OperationType::Delete => None,
+            _ => Some(planned.destination),
+        };
+
         let operation = Operation {
             id: Uuid::new_v4().to_string(),
             operation_type: planned.operation_type,
             source_path: planned.source,
-            destination_path: Some(planned.destination),
-            original_name: None,
+            destination_path,
+            original_name: Some(planned.file_name.clone()),
             new_name: None,
             timestamp: Utc::now().timestamp(),
             status: match &result {
                 Ok(_) => OperationStatus::Completed,
                 Err(e) => OperationStatus::Failed(e.to_string()),
             },
-            batch_id: None,
+            batch_id: Some(batch_id.clone()),
             backup_path: None,
         };
+
+        // Save to database
+        if let Err(e) = save_operation_to_db(&app, &operation) {
+            eprintln!("Failed to save operation to database: {:?}", e);
+        }
 
         results.push(operation);
     }
@@ -114,7 +175,7 @@ pub async fn find_duplicates(
         if let Ok(mut f) = std::fs::File::open(&file.path) {
             let mut hasher = Sha256::new();
             let mut buffer = [0u8; 8192];
-            
+
             loop {
                 match f.read(&mut buffer) {
                     Ok(0) => break,

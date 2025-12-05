@@ -19,11 +19,12 @@ export interface ClassificationResult {
   reasoning: string;
 }
 
-// Settings Types
+// Settings Types (matches backend settings.rs)
 export interface AppSettings {
+  theme: string;
+  language: string;
   llm: LlmSettings;
   prompts: PromptSettings;
-  ui: UiSettings;
 }
 
 export interface LlmSettings {
@@ -41,18 +42,53 @@ export interface LlmConfig {
 
 export interface PromptSettings {
   filename_prompt: string;
-  content_prompt: string;
+  text_content_prompt: string;
+  image_prompt: string;
 }
 
-export interface UiSettings {
-  theme: "light" | "dark" | "system";
-}
-
+// Category types (matches backend category.rs)
 export interface Category {
   id: string;
   name: string;
-  icon: string;
-  color: string;
-  extensions: string[];
-  target_path: string;
+  description?: string;
+  target_folder: string;
+  rules: CategoryRule[];
+  icon?: string;
+  color?: string;
+}
+
+export interface CategoryRule {
+  rule_type: "extension" | "nameContains" | "nameRegex" | "mimeType" | "llmKeyword";
+  pattern: string;
+  priority: number;
+}
+
+// Operation types
+export interface PlannedOperation {
+  file_id: string;
+  file_name: string;
+  operation_type: "move" | "copy" | "rename" | "delete";
+  source: string;
+  destination: string;
+  category?: string;
+}
+
+export interface Operation {
+  id: string;
+  operation_type: "move" | "copy" | "rename" | "delete";
+  source_path: string;
+  destination_path?: string;
+  original_name?: string;
+  new_name?: string;
+  timestamp: number;
+  status: "pending" | "in_progress" | "completed" | "undone" | string;
+  batch_id?: string;
+  backup_path?: string;
+}
+
+export interface OperationBatch {
+  id: string;
+  operations: Operation[];
+  created_at: number;
+  description: string;
 }

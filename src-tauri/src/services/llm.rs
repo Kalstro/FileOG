@@ -122,10 +122,10 @@ impl LlmService {
         user_prompt: &str,
     ) -> Result<String, AppError> {
         match self.config.provider.as_str() {
-            "openai" | "openai-compatible" => {
+            "openai" | "openai-compatible" | "custom" => {
                 self.send_openai_request(system_prompt, user_prompt).await
             }
-            "claude" => {
+            "anthropic" | "claude" => {
                 self.send_claude_request(system_prompt, user_prompt).await
             }
             "ollama" => {
@@ -144,9 +144,17 @@ impl LlmService {
         user_prompt: &str,
     ) -> Result<String, AppError> {
         let endpoint = if self.config.api_endpoint.is_empty() {
-            "https://api.openai.com/v1/chat/completions"
+            "https://api.openai.com/v1/chat/completions".to_string()
         } else {
-            &self.config.api_endpoint
+            // Append /chat/completions if not already present
+            let base = self.config.api_endpoint.trim_end_matches('/');
+            if base.ends_with("/chat/completions") {
+                base.to_string()
+            } else if base.ends_with("/v1") {
+                format!("{}/chat/completions", base)
+            } else {
+                format!("{}/v1/chat/completions", base)
+            }
         };
 
         let request = ChatRequest {
@@ -166,7 +174,7 @@ impl LlmService {
         };
 
         let response = self.client
-            .post(endpoint)
+            .post(&endpoint)
             .header("Authorization", format!("Bearer {}", self.config.api_key))
             .header("Content-Type", "application/json")
             .json(&request)

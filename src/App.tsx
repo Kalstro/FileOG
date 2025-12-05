@@ -6,14 +6,24 @@ import { SettingsDialog } from "@/components/settings/SettingsDialog";
 import { Button } from "@/components/ui/button";
 import { Copy, Trash2, FolderOutput, Sparkles } from "lucide-react";
 import { invoke, Channel } from "@tauri-apps/api/core";
-import { open } from "@tauri-apps/plugin-dialog";
+import { open, confirm } from "@tauri-apps/plugin-dialog";
 import { classifyFiles, getFileExtension } from "@/services/llm";
+import { toast } from "sonner";
+import type { PlannedOperation } from "@/types";
 
 interface ScanProgress {
   event: string;
   current_file?: string;
   scanned_count: number;
   total_count?: number;
+}
+
+interface OperationProgress {
+  event: string;
+  current_file?: string;
+  completed_count: number;
+  total_count: number;
+  percentage: number;
 }
 
 function App() {
@@ -49,6 +59,7 @@ function App() {
       setFiles(result);
     } catch (e) {
       console.error("Scan failed:", e);
+      toast.error(`扫描失败: ${e}`);
     } finally {
       setIsProcessing(false);
     }
@@ -107,11 +118,135 @@ function App() {
           return file;
         })
       );
+      toast.success(`成功分类 ${results.length} 个文件`);
     } catch (e) {
       console.error("Classification failed:", e);
-      alert(`分类失败: ${e}`);
+      toast.error(`分类失败: ${e}`);
     } finally {
       setIsClassifying(false);
+    }
+  }, [files, selectedIds]);
+
+  const handleMoveTo = useCallback(async () => {
+    if (selectedIds.size === 0) return;
+
+    const destination = await open({ directory: true, title: "选择目标文件夹" });
+    if (!destination) return;
+
+    const selectedFiles = files.filter((f) => selectedIds.has(f.id));
+    const operations: PlannedOperation[] = selectedFiles.map((f) => ({
+      file_id: f.id,
+      file_name: f.name,
+      operation_type: "move",
+      source: f.path,
+      destination: `${destination}/${f.name}`,
+    }));
+
+    setIsProcessing(true);
+    setProgress({ current: 0, total: operations.length, file: "正在移动..." });
+
+    const onProgress = new Channel<OperationProgress>();
+    onProgress.onmessage = (msg) => {
+      setProgress({
+        current: msg.completed_count,
+        total: msg.total_count,
+        file: msg.current_file || "",
+      });
+    };
+
+    try {
+      await invoke("execute_operations", { operations, onProgress });
+      // Remove moved files from list
+      setFiles((prev) => prev.filter((f) => !selectedIds.has(f.id)));
+      setSelectedIds(new Set());
+      toast.success(`成功移动 ${operations.length} 个文件`);
+    } catch (e) {
+      console.error("Move failed:", e);
+      toast.error(`移动失败: ${e}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [files, selectedIds]);
+
+  const handleCopyTo = useCallback(async () => {
+    if (selectedIds.size === 0) return;
+
+    const destination = await open({ directory: true, title: "选择目标文件夹" });
+    if (!destination) return;
+
+    const selectedFiles = files.filter((f) => selectedIds.has(f.id));
+    const operations: PlannedOperation[] = selectedFiles.map((f) => ({
+      file_id: f.id,
+      file_name: f.name,
+      operation_type: "copy",
+      source: f.path,
+      destination: `${destination}/${f.name}`,
+    }));
+
+    setIsProcessing(true);
+    setProgress({ current: 0, total: operations.length, file: "正在复制..." });
+
+    const onProgress = new Channel<OperationProgress>();
+    onProgress.onmessage = (msg) => {
+      setProgress({
+        current: msg.completed_count,
+        total: msg.total_count,
+        file: msg.current_file || "",
+      });
+    };
+
+    try {
+      await invoke("execute_operations", { operations, onProgress });
+      toast.success(`成功复制 ${operations.length} 个文件`);
+    } catch (e) {
+      console.error("Copy failed:", e);
+      toast.error(`复制失败: ${e}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [files, selectedIds]);
+
+  const handleDelete = useCallback(async () => {
+    if (selectedIds.size === 0) return;
+
+    const confirmed = await confirm(
+      `确定要删除选中的 ${selectedIds.size} 个文件吗？此操作不可撤销。`,
+      { title: "确认删除", kind: "warning" }
+    );
+    if (!confirmed) return;
+
+    const selectedFiles = files.filter((f) => selectedIds.has(f.id));
+    const operations: PlannedOperation[] = selectedFiles.map((f) => ({
+      file_id: f.id,
+      file_name: f.name,
+      operation_type: "delete",
+      source: f.path,
+      destination: "",
+    }));
+
+    setIsProcessing(true);
+    setProgress({ current: 0, total: operations.length, file: "正在删除..." });
+
+    const onProgress = new Channel<OperationProgress>();
+    onProgress.onmessage = (msg) => {
+      setProgress({
+        current: msg.completed_count,
+        total: msg.total_count,
+        file: msg.current_file || "",
+      });
+    };
+
+    try {
+      await invoke("execute_operations", { operations, onProgress });
+      // Remove deleted files from list
+      setFiles((prev) => prev.filter((f) => !selectedIds.has(f.id)));
+      setSelectedIds(new Set());
+      toast.success(`成功删除 ${operations.length} 个文件`);
+    } catch (e) {
+      console.error("Delete failed:", e);
+      toast.error(`删除失败: ${e}`);
+    } finally {
+      setIsProcessing(false);
     }
   }, [files, selectedIds]);
 
@@ -124,15 +259,33 @@ function App() {
               已选择 {selectedIds.size} 项
             </span>
             <div className="flex-1" />
-            <Button size="sm" variant="outline" className="gap-1">
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1"
+              onClick={handleMoveTo}
+              disabled={isProcessing}
+            >
               <FolderOutput className="h-4 w-4" />
               移动到
             </Button>
-            <Button size="sm" variant="outline" className="gap-1">
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1"
+              onClick={handleCopyTo}
+              disabled={isProcessing}
+            >
               <Copy className="h-4 w-4" />
               复制到
             </Button>
-            <Button size="sm" variant="outline" className="gap-1 text-destructive">
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1 text-destructive"
+              onClick={handleDelete}
+              disabled={isProcessing}
+            >
               <Trash2 className="h-4 w-4" />
               删除
             </Button>
@@ -140,7 +293,7 @@ function App() {
               size="sm"
               className="gap-1"
               onClick={handleClassify}
-              disabled={isClassifying}
+              disabled={isClassifying || isProcessing}
             >
               <Sparkles className="h-4 w-4" />
               {isClassifying ? "分类中..." : "AI 分类"}

@@ -57,3 +57,6 @@ coverage/
 *.AppImage
 *.deb
 *.rpm
+src-tauri/CLAUDE.md
+CLAUDE.md
+.claude/index.json

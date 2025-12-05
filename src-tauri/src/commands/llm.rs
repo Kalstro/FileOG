@@ -113,20 +113,20 @@ fn get_category_names(app: &tauri::AppHandle) -> Result<Vec<String>, AppError> {
 
         #[derive(serde::Deserialize)]
         struct Category {
-            id: String,
+            name: String,
         }
 
         let categories: Vec<Category> = serde_json::from_str(&content)?;
-        Ok(categories.into_iter().map(|c| c.id).collect())
+        Ok(categories.into_iter().map(|c| c.name).collect())
     } else {
         Ok(vec![
-            "documents".to_string(),
-            "images".to_string(),
-            "videos".to_string(),
-            "music".to_string(),
-            "code".to_string(),
-            "archives".to_string(),
-            "others".to_string(),
+            "文档".to_string(),
+            "图片".to_string(),
+            "视频".to_string(),
+            "音乐".to_string(),
+            "代码".to_string(),
+            "压缩包".to_string(),
+            "其他".to_string(),
         ])
     }
 }

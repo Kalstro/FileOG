@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import {
   Sidebar,
   SidebarContent,
@@ -24,6 +25,8 @@ import {
   Settings,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { invoke } from "@tauri-apps/api/core";
+import { toast } from "sonner";
 
 const categories = [
   { id: "documents", name: "文档", icon: FileText, color: "#3B82F6" },
@@ -35,17 +38,64 @@ const categories = [
   { id: "others", name: "其他", icon: File, color: "#71717A" },
 ];
 
+interface OperationBatch {
+  id: string;
+  operations: unknown[];
+  created_at: number;
+  description: string;
+}
+
 interface AppSidebarProps {
   onScan?: () => void;
   onOpenSettings?: () => void;
 }
 
 export function AppSidebar({ onScan, onOpenSettings }: AppSidebarProps) {
+  const [historyCount, setHistoryCount] = useState(0);
+
+  useEffect(() => {
+    loadHistoryCount();
+  }, []);
+
+  const loadHistoryCount = async () => {
+    try {
+      const history = await invoke<OperationBatch[]>("get_operation_history", { limit: 100 });
+      const total = history.reduce((acc, batch) => acc + batch.operations.length, 0);
+      setHistoryCount(total);
+    } catch {
+      // Silently fail if history can't be loaded
+    }
+  };
+
+  const handleUndo = async () => {
+    try {
+      const result = await invoke<unknown[]>("undo_operations", { steps: 1 });
+      if (result.length > 0) {
+        toast.success(`已撤销 ${result.length} 个操作`);
+        loadHistoryCount();
+      } else {
+        toast.info("没有可撤销的操作");
+      }
+    } catch (e) {
+      toast.error(`撤销失败: ${e}`);
+    }
+  };
+
+  const handleShowHistory = async () => {
+    try {
+      const history = await invoke<OperationBatch[]>("get_operation_history", { limit: 50 });
+      const total = history.reduce((acc, batch) => acc + batch.operations.length, 0);
+      toast.info(`历史记录中共有 ${total} 个操作`);
+    } catch (e) {
+      toast.error(`加载历史失败: ${e}`);
+    }
+  };
+
   return (
     <Sidebar>
       <SidebarHeader className="p-4">
-        <Button 
-          className="w-full justify-start gap-2" 
+        <Button
+          className="w-full justify-start gap-2"
           variant="outline"
           onClick={onScan}
         >
@@ -53,7 +103,7 @@ export function AppSidebar({ onScan, onOpenSettings }: AppSidebarProps) {
           选择文件夹扫描
         </Button>
       </SidebarHeader>
-      
+
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>分类</SidebarGroupLabel>
@@ -62,9 +112,9 @@ export function AppSidebar({ onScan, onOpenSettings }: AppSidebarProps) {
               {categories.map((category) => (
                 <SidebarMenuItem key={category.id}>
                   <SidebarMenuButton>
-                    <category.icon 
-                      className="h-4 w-4" 
-                      style={{ color: category.color }} 
+                    <category.icon
+                      className="h-4 w-4"
+                      style={{ color: category.color }}
                     />
                     <span>{category.name}</span>
                   </SidebarMenuButton>
@@ -79,16 +129,18 @@ export function AppSidebar({ onScan, onOpenSettings }: AppSidebarProps) {
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton>
+                <SidebarMenuButton onClick={handleShowHistory}>
                   <History className="h-4 w-4" />
                   <span>历史记录</span>
+                  {historyCount > 0 && (
+                    <span className="ml-auto text-xs text-muted-foreground">{historyCount}</span>
+                  )}
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton>
+                <SidebarMenuButton onClick={handleUndo}>
                   <Undo2 className="h-4 w-4" />
                   <span>撤销</span>
-                  <span className="ml-auto text-xs text-muted-foreground">0</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
