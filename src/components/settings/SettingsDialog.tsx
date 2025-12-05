@@ -51,12 +51,20 @@ interface AppSettings {
   prompts: PromptSettings;
 }
 
+interface CategoryRule {
+  rule_type: string;
+  pattern: string;
+  priority: number;
+}
+
 interface Category {
   id: string;
   name: string;
-  extensions: string[];
-  color: string;
-  icon: string;
+  description?: string;
+  target_folder: string;
+  rules: CategoryRule[];
+  color?: string;
+  icon?: string;
 }
 
 interface SettingsDialogProps {
@@ -158,7 +166,13 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     const newCategory: Category = {
       id: crypto.randomUUID(),
       name: "新分类",
-      extensions: [],
+      description: "",
+      target_folder: "NewCategory",
+      rules: [{
+        rule_type: "extension",
+        pattern: "",
+        priority: 1,
+      }],
       color: "#6366f1",
       icon: "folder",
     };
@@ -413,15 +427,31 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                         </div>
                       </div>
                       <div>
-                        <Label className="text-xs">扩展名（逗号分隔）</Label>
+                        <Label className="text-xs">目标文件夹</Label>
                         <Input
-                          value={category.extensions.join(", ")}
+                          value={category.target_folder}
                           onChange={(e) =>
                             updateCategory(category.id, {
-                              extensions: e.target.value
+                              target_folder: e.target.value,
+                            })
+                          }
+                          placeholder="Documents"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">匹配规则（扩展名，逗号分隔）</Label>
+                        <Input
+                          value={category.rules.map(r => r.pattern).join(", ")}
+                          onChange={(e) =>
+                            updateCategory(category.id, {
+                              rules: e.target.value
                                 .split(",")
-                                .map((s) => s.trim())
-                                .filter(Boolean),
+                                .map((s, i) => ({
+                                  rule_type: "extension",
+                                  pattern: s.trim(),
+                                  priority: i + 1,
+                                }))
+                                .filter(r => r.pattern),
                             })
                           }
                           placeholder=".pdf, .doc, .docx"
